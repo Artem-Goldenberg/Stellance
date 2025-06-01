@@ -6,7 +6,10 @@ import PackageDescription
 let package = Package(
     name: "Stellance",
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
+        .package(
+            url: "https://github.com/Artem-Goldenberg/SwiftStella.git",
+            branch: "main"
+        )
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -14,8 +17,13 @@ let package = Package(
         .executableTarget(
             name: "Stellance",
             dependencies: [
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Stella", package: "SwiftStella")
             ]
         ),
-    ]
+        .testTarget(
+            name: "StellanceTests",
+            dependencies: ["Stellance"]
+        )
+    ],
+    swiftLanguageModes: [.v5]
 )
