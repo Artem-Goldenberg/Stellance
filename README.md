@@ -40,6 +40,8 @@ If the provided program type checks fine, the type checker will finish with 0 re
 - [Errors.swift](Sources/Stellance/Errors.swift) all supported errors and error messages
 - [Model.swift](Sources/Stellance/Model.swift) some important structures including an enum of all the supported extensions
 
+## Stages
 
+- Implementation for Stage 1 should support all extesions (extra ones as well) specified in the pdf task for this stage
 
 
