@@ -34,8 +34,10 @@ extension DefaultStringInterpolation {
 
         let left = Self.maxLineWidth - taken
 
-        if value.count < left {
+        if !value.contains("\n") && value.count < left {
+            appendLiteral("`")
             appendInterpolation(value)
+            appendLiteral("`")
         } else {
             appendLiteral("\n    ")
             appendInterpolation(indented: value)

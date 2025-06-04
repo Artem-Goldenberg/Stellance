@@ -150,8 +150,8 @@ func |-(context: Context, check: TypeCheck) throws {
             }
         }
 
-    case let .fix(fixee):
-        try context |- fixee <= .function(from: [type], to: type)
+//    case let .fix(fixee): could be inferring but then error message will be wrong
+//        try context |- fixee <= .function(from: [type], to: type)
 
     default:
         // try infering type instead
@@ -183,20 +183,20 @@ func |?(patterns: [Pattern], type: Type) -> Bool {
             if case .succ = $0 { return true }
             return false
         }
-    case .sum(let left, let right):
+    case .sum:
         return patterns.contains {
-            if case let .inl(pat) = $0, [pat] |? left {
+            if case .inl = $0 {
                 return true
             }
             return false
         } &&
         patterns.contains {
-            if case let .inr(pat) = $0, [pat] |? right {
+            if case .inr = $0 {
                 return true
             }
             return false
         }
-    case .list(let of):
+    case .list:
         return patterns.contains {
             if case .list([]) = $0 {
                 return true
@@ -204,7 +204,7 @@ func |?(patterns: [Pattern], type: Type) -> Bool {
             return false
         } &&
         patterns.contains {
-            if case let .cons(h, _) = $0, [h] |? of {
+            if case .cons = $0 {
                 return true
             }
             return false
@@ -217,8 +217,8 @@ func |?(patterns: [Pattern], type: Type) -> Bool {
                     return false
                 }
                 switch (pattern, type) {
-                case let (.some(pattern), .some(type)):
-                    return [pattern] |? type
+                case (.some, .some):
+                    return true
                 case (.none, .none):
                     return true
                 default:

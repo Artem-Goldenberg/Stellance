@@ -123,10 +123,6 @@ func check(_ expr: Expression, in context: GlobalContext) throws {
         try recCheck(expression)
 
     case let .match(matchee, branches):
-        // strange, but in example impl, match is allowed in core,
-        // here I leave it if structural-patterns are on
-        try require(.structuralPatterns, or: .sumTypes, or: .variants)
-
         guard !branches.isEmpty else {
             throw Code.error(.emptyMatch(expr))
         }

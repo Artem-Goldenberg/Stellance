@@ -23,7 +23,7 @@ func |-(context: Context, expr: Expression) throws -> Type {
     case let .application(callee, arguments):
         let calleeType = try context |- callee
         guard case let .function(paramTypes, returnType) = calleeType else {
-            throw Code.error(.notAFunction(actualType: calleeType, in: expr))
+            throw Code.error(.notAFunction(actualType: calleeType, what: callee, in: expr))
         }
         guard arguments.count == paramTypes.count else {
             throw Code.error(
@@ -164,11 +164,11 @@ func |-(context: Context, expr: Expression) throws -> Type {
     case let .fix(theExpr):
         let exprType = try context |- theExpr
         guard case let .function(fromTypes, toType) = exprType else {
-            throw Code.error(.notAFunction(actualType: exprType, in: expr))
+            throw Code.error(.notAFunction(actualType: exprType, what: theExpr, in: expr))
         }
         guard fromTypes.count == 1 else {
             throw Code.error(
-                .unexpectedParametersNumber(fromTypes.count, expected: 1, for: exprType, in: expr)
+                .incorrectArgumentsNumber(fromTypes.count, expected: 1, for: exprType, in: expr)
             )
         }
         guard fromTypes[0] == toType else {
@@ -176,7 +176,7 @@ func |-(context: Context, expr: Expression) throws -> Type {
                 .unexpectedType(toType, expected: fromTypes[0], in: expr)
             )
         }
-        return .function(from: fromTypes, to: toType)
+        return toType
 
     default:
         throw Code.unsupported(expr, description: "Inference not implemented")

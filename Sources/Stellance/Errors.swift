@@ -4,7 +4,7 @@ enum TypeCheckError: Error {
     case missingMain
     case undefinedVariable(Identifier)
     case unexpectedType(Type, expected: Type, in: Expression)
-    case notAFunction(actualType: Type, in: Expression)
+    case notAFunction(actualType: Type, what: Expression, in: Expression)
     case notATuple(actualType: Type, in: Expression)
     case notARecord(actualType: Type, in: Expression)
     case notAList(actualType: Type, in: Expression)
@@ -51,7 +51,7 @@ extension TypeCheckError {
     var code: String {
         switch self {
         case .missingMain: "ERROR_MISSING_MAIN"
-        case .undefinedVariable: "ERROR_UDEFINED_VARIABLE"
+        case .undefinedVariable: "ERROR_UNDEFINED_VARIABLE"
         case .unexpectedType: "ERROR_UNEXPECTED_TYPE_FOR_EXPRESSION"
         case .notAFunction: "ERROR_NOT_A_FUNCTION"
         case .notATuple: "ERROR_NOT_A_TUPLE"
@@ -108,10 +108,10 @@ extension TypeCheckError {
             In expression: 
                 \(indented: expr.code)
             """
-        case let .notAFunction(actualType, in: expr):
+        case let .notAFunction(actualType, what, in: expr):
             """
-            Callee type is not a function type
-            Actual type is: \(wrap: actualType.code)
+            Expression: \(wrap: what.code) is expected to have a function type
+            But instead it's type is: \(wrap: actualType.code)
             In expression:
                 \(indented: expr.code)
             """
@@ -119,8 +119,8 @@ extension TypeCheckError {
             """
             Was expecting \(expected) argument\(expected != 1 ? "s" : ""), \
             instead got \(actual) argument\(actual != 1 ? "s" : "")
-            For callee of type: \(wrap: calleeType.code)
-            In call expression: 
+            For the function of type: \(wrap: calleeType.code)
+            In expression: 
                 \(indented: expr.code)
             """
         case let .unexpectedLambda(expr, expected: type):

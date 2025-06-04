@@ -23,9 +23,9 @@ git clone --recurse-submodules "https://github.com/Artem-Goldenberg/Stellance.gi
   use `git submodule init` and then `git submodule update` commands 
   to download submodule dependencies.
 
-After that, you can run an executable using 
+After that, you can run an executable using something like
 ```
-swift run
+cat <stella-source> | swift run
 ```
 
 It will read stella source code from the standard input and print issues to the standard output and standard error.

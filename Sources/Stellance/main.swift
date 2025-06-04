@@ -12,10 +12,14 @@ func warning(_ message: String) {
     print("Warning: \(message)", to: &standardError)
 }
 
-let file = CommandLine.arguments[1]
+func printError(_ message: String) {
+    print(message, to: &standardError)
+}
 
-//let programText = String(data: FileHandle.standardInput.availableData, encoding: .utf8)
-let programText = try? String(contentsOfFile: file, encoding: .utf8)
+//let file = CommandLine.arguments[1]
+//let programText = try? String(contentsOfFile: file, encoding: .utf8)
+
+let programText = String(data: FileHandle.standardInput.availableData, encoding: .utf8)
 guard let programText else {
     quit(with: "Failed to read Stella program from the standard input")
 }
@@ -83,26 +87,27 @@ do {
     switch error {
 
     case .unsupported(let what, let description, let tryEnabling):
-        print("(kind of a) SYNTAX ERROR:\n")
-
-        print(what.code)
-        if let description {
-            print(description, terminator: " ")
-        }
-
-        print("is not supported\n")
+        printError(
+            """
+            
+            Unsupported Syntax:
+                \(indented: what.code)
+            \(description ?? "")
+            """
+        )
 
         if let tryEnabling {
-            print("Try enabling \(tryEnabling)\n")
+            printError("Try enabling \(tryEnabling)\n")
         }
 
     case .error(let code):
-        print(code.code)
-        print()
+        printError("")
+        printError(code.code)
+        printError("")
         if let generalMessage = code.message {
-            print(generalMessage)
+            printError(generalMessage)
         }
-        print("\n")
+        printError("")
     }
 
     exit(EXIT_FAILURE)
