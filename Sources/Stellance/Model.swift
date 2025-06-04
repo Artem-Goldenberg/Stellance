@@ -1,6 +1,6 @@
 import Stella
 
-enum KnownExtension: String, CustomStringConvertible {
+enum KnownExtension: String, CustomStringConvertible, CaseIterable {
     case unitType = "unit-type"
     case pairs
     case tuples
@@ -60,19 +60,4 @@ struct LocalContext: Context {
     func isEnabled(_ ext: KnownExtension) -> Bool {
         next.isEnabled(ext)
     }
-}
-
-func +(context: Context, parameter: Declaration.Parameter) -> LocalContext {
-    LocalContext(next: context, name: parameter.name, type: parameter.type)
-}
-
-struct Typing {
-    let name: Identifier
-    let type: Type
-}
-
-infix operator --
-
-func --(name: Identifier, type: Type) -> Typing {
-    Typing(name: name, type: type)
 }

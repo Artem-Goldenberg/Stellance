@@ -28,7 +28,7 @@ func check(_ decl: Declaration, in context: GlobalContext) throws {
                 tryEnabling: .nullFunctions
             )
         }
-        guard parameters.count == 1 || context.isEnabled(.multiFunctions) else {
+        guard parameters.count <= 1 || context.isEnabled(.multiFunctions) else {
             throw Code.unsupported(
                 decl,
                 description: "Functions with multiple parameters",

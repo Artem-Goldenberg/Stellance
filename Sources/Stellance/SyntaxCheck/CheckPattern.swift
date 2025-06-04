@@ -24,6 +24,10 @@ func check(_ pattern: Pattern, in context: GlobalContext) throws {
 
     case let .record(patterns):
         try require(.structuralPatterns)
+        let dupNames = patterns.map(\.0).allDuplicates
+        guard dupNames.isEmpty else {
+            throw Code.error(.duplicatePatternFields(dupNames, in: pattern))
+        }
         try patterns.map(\.1).forEach(recCheck)
 
     case let .inl(pattern), let .inr(pattern):

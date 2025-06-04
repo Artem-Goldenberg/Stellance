@@ -20,7 +20,7 @@ func check(_ type: Type, in context: GlobalContext) throws {
                 type, description: "Zero argument function type", tryEnabling: .nullFunctions
             )
         }
-        guard arguments.count == 1 || context.isEnabled(.multiFunctions) else {
+        guard arguments.count <= 1 || context.isEnabled(.multiFunctions) else {
             throw Code.unsupported(
                 type, description: "Multi argument function type", tryEnabling: .multiFunctions
             )
@@ -40,6 +40,10 @@ func check(_ type: Type, in context: GlobalContext) throws {
 
     case .record(let fields):
         try require(.records)
+        let dupNames = fields.map(\.0).allDuplicates
+        guard dupNames.isEmpty else {
+            throw Code.error(.duplicateTypeFields(dupNames, in: type))
+        }
         try fields.map(\.1).forEach(recCheck)
 
     case .sum(let left, let right):
@@ -51,14 +55,19 @@ func check(_ type: Type, in context: GlobalContext) throws {
         try require(.lists)
         try recCheck(of)
 
-    case .variant(let array):
+    case .variant(let tags):
         try require(.variants)
 
-        if array.anySatisfy({ $0.1 == nil }) {
+        let dupTags = tags.map(\.0).allDuplicates
+        guard dupTags.isEmpty else {
+            throw Code.error(.duplicateTypeTags(dupTags, in: type))
+        }
+
+        if tags.anySatisfy({ $0.1 == nil }) {
             try require(.nullVariants)
         }
 
-        try array.compactMap(\.1).forEach(recCheck)
+        try tags.compactMap(\.1).forEach(recCheck)
 
     default:
         throw Code.unsupported(type, tryEnabling: nil)

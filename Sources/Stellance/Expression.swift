@@ -12,150 +12,99 @@ precedencegroup TypeCheckPrecedence {
     associativity: none
 }
 
+precedencegroup PatternMatchingPrecedence {
+    higherThan: AdditionPrecedence
+    lowerThan: MultiplicationPrecedence
+    associativity: none
+}
+
 infix operator |-: ContextPrecedence
 infix operator <=: TypeCheckPrecedence
-infix operator =>: TypeCheckPrecedence
+infix operator ~>: PatternMatchingPrecedence
 
 struct TypeCheck {
     let node: Expression
     let type: Type
 }
 
+struct Binding {
+    let pattern: Pattern
+    let type: Type
+}
+
+struct Typing {
+    let name: Identifier
+    let type: Type
+}
+
+func ~>(pattern: Pattern, type: Type) -> Binding {
+    Binding(pattern: pattern, type: type)
+}
+
+func ~>(name: Identifier, type: Type) -> Typing {
+    Typing(name: name, type: type)
+}
 
 func <=(node: Expression, type: Type) -> TypeCheck {
-    return TypeCheck(node: node, type: type)
+    TypeCheck(node: node, type: type)
+}
+
+func +(context: Context, parameter: Declaration.Parameter) -> LocalContext {
+    LocalContext(next: context, name: parameter.name, type: parameter.type)
+}
+
+func +(context: Context, typing: Typing) -> LocalContext {
+    LocalContext(next: context, name: typing.name, type: typing.type)
+}
+
+func +(context: Context, declaration: Declaration) throws -> LocalContext {
+    switch declaration {
+    case let .function(_, name, parameters, .some(returnType), _, _, _):
+        context + name ~> .function(from: parameters.map(\.type), to: returnType)
+    default:
+        throw Code.unsupported(declaration)
+    }
 }
 
 func expect(_ type: Type, actual: Type, in expr: Expression) throws {
     guard type == actual else {
         throw Code.error(
-            .unexpectedType,
-            message:
-                """
-                Expected type: 
-                    \(type.code)
-                Actual type: 
-                    \(actual.code)
-                In expression: 
-                    \(expr.code)
-                """
+            .unexpectedType(actual, expected: type, in: expr)
         )
     }
 }
 
-/// Type inference
-func |-(context: Context, expression: Expression) throws -> Type {
-    switch expression {
-    case .var(let identifier):
-        guard let type = context.type(of: identifier) else {
-            throw Code.error(.undefinedVariable, message: "\(identifier.value)")
-        }
-        return type
-    case .constTrue, .constFalse: return .bool
-    case .constUnit: return .unit
-//    case .if(let condition, let onTrue, let onFalse):
-//        try context |- condition <= .bool
-//        let type1 = try context |- onTrue
-//        let type2 = try context |- onFalse
-//        try expect(type1, actual: type2, in: expression)
-//        return type1
-    case .constInt(0): return .nat
-    case .succ(let nat), .pred(let nat):
-        try context |- nat <= .nat
-        return .nat
-    case .isZero(let nat):
-        try context |- nat <= .nat
-        return .bool
-//    case .natRec(let num, let ini, let step):
-//        try context |- num <= .nat
-//        let type = try context |- ini
-//        try context |- step <= .function(from: [.nat], to: .function(from: [type], to: type))
-//        return type
-    default:
-        throw Code.unsupported(expression)
+func |-(context: GlobalContext, program: Program) throws {
+    guard let main = context.globalVariables["main"]
+    else { throw Code.error(.missingMain) }
+
+    guard case .function(let parameters, _) = main else {
+        throw Code.error(.missingMain)
+    }
+
+    guard parameters.count == 1 else {
+        throw Code.error(.incorrectMainArity(parameters.count))
+    }
+
+    for decl in program.declarations {
+        try context |- decl
     }
 }
 
-func |-(context: Context, check: TypeCheck) throws {
-    let type = check.type
+func |-(context: Context, declaration: Declaration) throws {
+    switch declaration {
+    case .function(_, _, let parameters, .some(let returnType), _, let body, let `return`):
+        // sick
+        let contextWithParams = parameters.reduce(context, +)
+        let localContext = try body.reduce(contextWithParams, +)
 
-    switch check.node {
-    case let .if(condition, onTrue, onFalse):
-        try context |- condition <= .bool
-        try context |- onTrue <= type
-        try context |- onFalse <= type
+        for declaration in body {
+            try localContext |- declaration
+        }
 
-    case let .natRec(numExpr, iniExpr, stepExpr):
-        try context |- numExpr <= .nat
-        try context |- iniExpr <= type
-        try context |- stepExpr <= .function(from: [.nat], to: .function(from: [type], to: type))
-
-    case let .abstraction(parameters, body):
-        guard case let .function(paramTypes, returnType) = type else {
-            throw Code.error(
-                .unexpectedLambda,
-                message: "Expected type: \(type) cannot be assigned to lambda: \(check.node)"
-            )
-        }
-        guard paramTypes.count == parameters.count else {
-            throw Code.error(
-                .unexpectedParametersNumber,
-                message:
-                "Expected \(paramTypes.count), but got \(parameters.count), in: \(check.node)"
-            )
-        }
-        for (param, type) in zip(parameters, paramTypes) {
-            guard param.type == type else {
-                throw Code.error(
-                    .unexpectedParameterType,
-                    message: "Expected \(type), instead have: \(param.type), in: \(check.node)"
-                )
-            }
-        }
-        // this is sick!!!
-        try parameters.reduce(context, +) |- body <= returnType
-
-    case let .application(callee, arguments):
-        let calleeType = try context |- callee
-        guard case let .function(paramTypes, returnType) = calleeType else {
-            throw Code.error(
-                .notAFunction,
-                message:
-                    """
-                    Callee is not a function, instead it's type is: \(calleeType),
-                    need a functional callee type for: \(check.node)
-                    """
-            )
-        }
-        guard arguments.count == paramTypes.count else {
-            throw Code.error(
-                .incorrectArgumentsNumber,
-                message:
-                    """
-                    Was expecting \(paramTypes.count) arguments,
-                    because \(callee) is of type \(calleeType),
-                    instead have \(arguments.count) arguments
-                    in call: \(check.node)
-                    """
-            )
-        }
-        for (argument, type) in zip(arguments, paramTypes) {
-            try context |- argument <= type
-        }
-        try expect(type, actual: returnType, in: check.node)
-
+        try localContext |- `return` <= returnType
 
     default:
-        // try infering type instead
-        let inferred = try context |- check.node
-        try expect(type, actual: inferred, in: check.node)
-    }
-}
-
-extension String {
-    init(byDumping stuff: Any) {
-        var str = String()
-        dump(stuff, to: &str)
-        self = str
+        throw Code.unsupported(declaration)
     }
 }

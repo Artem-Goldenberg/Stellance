@@ -4,12 +4,20 @@ func check(_ expr: Expression, in context: GlobalContext) throws {
     func recCheck(_ expr: Expression) throws {
         try check(expr, in: context)
     }
-    func require(_ ext: KnownExtension, or other: KnownExtension? = nil) throws {
-        if let other {
-            try betterEnable(ext, or: other, for: expr, in: context)
-        } else {
+    func require(
+        _ ext: KnownExtension,
+        or other: KnownExtension? = nil,
+        or another: KnownExtension? = nil
+    ) throws {
+        guard let other else {
             try betterEnable(ext, for: expr, in: context)
+            return
         }
+        guard let another else {
+            try betterEnable(ext, or: other, for: expr, in: context)
+            return
+        }
+        try betterEnable(ext, or: other, another, for: expr, in: context)
     }
 
     switch expr {
@@ -42,7 +50,7 @@ func check(_ expr: Expression, in context: GlobalContext) throws {
                 expr, description: "Zero argument lambdas", tryEnabling: .nullFunctions
             )
         }
-        guard parameters.count == 1 || context.isEnabled(.multiFunctions) else {
+        guard parameters.count <= 1 || context.isEnabled(.multiFunctions) else {
             throw Code.unsupported(
                 expr, description: "Multi argument lambdas", tryEnabling: .multiFunctions
             )
@@ -73,6 +81,10 @@ func check(_ expr: Expression, in context: GlobalContext) throws {
 
     case let .record(fields):
         try require(.records)
+        let dupNames = fields.map(\.0).allDuplicates
+        guard dupNames.isEmpty else {
+            throw Code.error(.duplicateFields(dupNames, in: expr))
+        }
         try fields.map(\.1).forEach(recCheck)
 
     case let .dotRecord(indexee, _):
@@ -113,7 +125,12 @@ func check(_ expr: Expression, in context: GlobalContext) throws {
     case let .match(matchee, branches):
         // strange, but in example impl, match is allowed in core,
         // here I leave it if structural-patterns are on
-        try require(.sumTypes, or: .structuralPatterns)
+        try require(.structuralPatterns, or: .sumTypes, or: .variants)
+
+        guard !branches.isEmpty else {
+            throw Code.error(.emptyMatch(expr))
+        }
+
         try recCheck(matchee)
         try branches.map(\.0).forEach { try check($0, in: context) }
         try branches.map(\.1).forEach(recCheck)

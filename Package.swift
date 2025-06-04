@@ -22,7 +22,10 @@ let package = Package(
         ),
         .testTarget(
             name: "StellanceTests",
-            dependencies: ["Stellance"]
+            dependencies: ["Stellance"],
+            resources: [
+                .copy("Resources/stella-tests")
+            ]
         )
     ],
     swiftLanguageModes: [.v5]

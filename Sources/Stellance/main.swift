@@ -6,8 +6,10 @@ func quit(with message: String) -> Never {
     exit(EXIT_FAILURE)
 }
 
+var standardError = FileHandle.standardError
+
 func warning(_ message: String) {
-    print("Warning: \(message)")
+    print("Warning: \(message)", to: &standardError)
 }
 
 let file = CommandLine.arguments[1]
@@ -27,74 +29,54 @@ do {
     quit(with: error.localizedDescription)
 }
 
-let extensionNames: [String] = program.extensions.flatMap(\.names).map(\.value)
-
-let enabledExtensions: [KnownExtension] = extensionNames.compactMap { name in
-    guard let ext = KnownExtension(rawValue: String(name))
-    else {
-        warning("Unrecognized extension: \(name)")
-        return nil
-    }
-    return ext
-}
-
-print()
 
 enum Code: Error {
+    case error(_ code: TypeCheckError)
     case unsupported(
         _ syntax: Syntax,
         description: String? = nil,
         tryEnabling: KnownExtension? = nil
     )
-    case error(_ code: TypeCheckError, message: String? = nil)
 }
 
-let declarationTypes: [(Identifier, Type)] = try program.declarations.map { decl in
-    switch decl {
-    case .function(_, let name, let parameters, .some(let returnType), _, _, _):
-        (
-            name,
-            Type.function(from: parameters.map(\.type), to: returnType)
-        )
-    default:
-        throw Code.unsupported(decl)
-    }
-}
+func staticCheck(the program: Program) throws {
+    let extensionNames: [String] = program.extensions.flatMap(\.names).map(\.value)
 
-let context = GlobalContext(
-    globalVariables: .init(uniqueKeysWithValues: declarationTypes),
-    enabledExntesions: enabledExtensions
-)
-
-func |-(context: GlobalContext, program: Program) throws {
-    guard let main = context.globalVariables.first(where: { $0.key.value == "main" })?.value
-    else { throw Code.error(.missingMain) }
-
-    guard case .function(let parameters, _) = main else {
-        throw Code.error(.missingMain)
+    let enabledExtensions: [KnownExtension] = extensionNames.compactMap { name in
+        guard let ext = KnownExtension(rawValue: name)
+        else {
+            warning("Unrecognized extension: \(name)")
+            return nil
+        }
+        return ext
     }
 
-    guard parameters.count == 1 else {
-        throw Code.error(.incorrectMainArity)
-    }
-
-    for decl in program.declarations {
+    let declarationTypes: [(Identifier, Type)] = try program.declarations.map { decl in
         switch decl {
-        case .function(_, _, let parameters, .some(let returnType), _, _, let `return`):
-            try parameters.reduce(context, +) |- `return` <= returnType
+        case .function(_, let name, let parameters, .some(let returnType), _, _, _):
+            (
+                name,
+                Type.function(from: parameters.map(\.type), to: returnType)
+            )
         default:
             throw Code.unsupported(decl)
         }
     }
-}
 
-do {
+    let context = GlobalContext(
+        globalVariables: .init(uniqueKeysWithValues: declarationTypes),
+        enabledExntesions: enabledExtensions
+    )
 
     for declaration in program.declarations {
         try check(declaration, in: context)
     }
 
     try context |- program
+}
+
+do {
+    try staticCheck(the: program)
 
 } catch let error as Code {
 
@@ -114,15 +96,13 @@ do {
             print("Try enabling \(tryEnabling)\n")
         }
 
-    case .error(let code, let message):
+    case .error(let code):
         print(code.code)
+        print()
         if let generalMessage = code.message {
             print(generalMessage)
         }
-        if let message {
-            print(message)
-        }
-        print()
+        print("\n")
     }
 
     exit(EXIT_FAILURE)
@@ -130,4 +110,11 @@ do {
 } catch let error {
     print("Unknown error: \(error.localizedDescription)")
     exit(EXIT_FAILURE)
+}
+
+extension FileHandle: @retroactive TextOutputStream {
+  public func write(_ string: String) {
+    let data = Data(string.utf8)
+    self.write(data)
+  }
 }
