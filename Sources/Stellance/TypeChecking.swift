@@ -6,6 +6,12 @@ func |-(context: Context, check: TypeCheck) throws {
     let type = check.type
     let expr = check.node
 
+    if case .top = type {
+        // otherwise, we would be here till the morning, oh, wait...
+        let _ = try context |- expr
+        return
+    }
+
     switch check.node {
     case let .if(condition, onTrue, onFalse):
         try context |- condition <= .bool
@@ -33,7 +39,7 @@ func |-(context: Context, check: TypeCheck) throws {
             )
         }
         for (param, expectedType) in zip(parameters, paramTypes) {
-            guard param.type == expectedType else {
+            guard compare(expectedType, param.type, in: context) else {
                 throw Code.error(
                     .unexpectedParameterType(
                         param.type, expected: expectedType,
@@ -73,14 +79,18 @@ func |-(context: Context, check: TypeCheck) throws {
         guard missingFields.isEmpty else {
             throw Code.error(.missingFields(.init(missingFields), for: type, in: expr))
         }
-        guard extraFields.isEmpty else {
+        guard extraFields.isEmpty || context.isEnabled(.subtyping) else {
             throw Code.error(.unexpectedFields(.init(extraFields), for: type, in: expr))
         }
 
-        // now we confirmed keys are all the same
+        // now we confirmed keys are all the same or it's a subtype!
         let typeForField = Dictionary(uniqueKeysWithValues: fieldTypes)
         for (field, expr) in fields {
-            try context |- expr <= typeForField[field]!
+            if let type = typeForField[field] {
+                try context |- expr <= type
+            } else {
+                let _ = try context |- expr
+            }
         }
 
     case let .let(bindings, inExpr):
@@ -153,15 +163,75 @@ func |-(context: Context, check: TypeCheck) throws {
 //    case let .fix(fixee): could be inferring but then error message will be wrong
 //        try context |- fixee <= .function(from: [type], to: type)
 
+    case let .sequence(first, second):
+        try context |- first <= .unit
+        try context |- second <= type
+
+    case let .ref(toExpr):
+        guard case .reference(let toType) = type else {
+            throw Code.error(.unexpectedReference(toExpr, expected: type))
+        }
+        try context |- toExpr <= toType
+
+    case let .deref(ref):
+        try context |- ref <= .reference(type)
+
+    case .constMemory:
+        guard case .reference(_) = type else {
+            throw Code.error(.unexpectedAddress(expr, expected: type))
+        }
+        // we just say ok ???? What is this even about?
+        return
+
+    case .panic:
+        return
+
+    case let .throw(theExpr):
+        guard let throwType = context.exceptionType else {
+            throw Code.error(.exceptionNotDeclared(usedIn: expr))
+        }
+        try context |- theExpr <= throwType
+
+    case let .tryWith(expr, recover):
+        try context |- expr <= type
+        try context |- recover <= type
+
+    case let .tryCatch(tryExpr, pattern, recover):
+        try context |- tryExpr <= type
+        guard let throwType = context.exceptionType else {
+            throw Code.error(.exceptionNotDeclared(usedIn: expr))
+        }
+        try context + pattern ~> throwType |- recover <= type
+
+    case let .tryCastAs(tryExpr, type, pattern, newExpr, with: recover):
+        let _ = try context |- tryExpr
+        try context + pattern ~> type |- newExpr <= type
+        try context |- recover <= type
+
     default:
         // try infering type instead
-        let inferred = try context |- check.node
-        try expect(type, actual: inferred, in: check.node)
+        let inferred = try context |- expr
+        if !context.isEnabled(.subtyping) {
+            guard inferred == type else {
+                throw Code.error(.unexpectedType(inferred, expected: type, in: expr))
+            }
+            return
+        }
+        guard inferred ~ type else {
+            throw Code.error(.unexpectedSubtype(inferred, of: type, in: expr))
+        }
+    }
+}
+
+func compare(_ type1: Type, _ type2: Type, in context: Context) -> Bool {
+    if context.isEnabled(.subtyping) {
+        return type1 ~ type2
+    } else {
+        return type1 == type2
     }
 }
 
 infix operator |?: MultiplicationPrecedence
-
 
 // not ideal, a lot of potential to improve
 func |?(patterns: [Pattern], type: Type) -> Bool {

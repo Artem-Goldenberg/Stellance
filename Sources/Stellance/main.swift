@@ -55,21 +55,38 @@ func staticCheck(the program: Program) throws {
         return ext
     }
 
-    let declarationTypes: [(Identifier, Type)] = try program.declarations.map { decl in
-        switch decl {
+    var globalVariables: [Identifier: Type] = [:]
+    var exceptionType: Type?
+    var exceptionVariantTags: [(Identifier, Type)] = []
+
+    for declaration in program.declarations {
+        switch declaration {
         case .function(_, let name, let parameters, .some(let returnType), _, _, _):
-            (
-                name,
-                Type.function(from: parameters.map(\.type), to: returnType)
-            )
+            let type = Type.function(from: parameters.map(\.type), to: returnType)
+            globalVariables[name] = type
+        case .exceptionType(let type):
+            exceptionType = type
+        case .exceptionVariant(let name, let type):
+            exceptionVariantTags.append((name, type))
+
         default:
-            throw Code.unsupported(decl)
+            continue
         }
     }
 
+    // checked declared open variant for exceptions is sound
+    let dups = exceptionVariantTags.map(\.0).allDuplicates
+    guard dups.isEmpty else {
+        throw Code.error(.duplicateTypeTags(dups, in: Type.variant(exceptionVariantTags)))
+    }
+
     let context = GlobalContext(
-        globalVariables: .init(uniqueKeysWithValues: declarationTypes),
-        enabledExntesions: enabledExtensions
+        globalVariables: globalVariables,
+        enabledExntesions: enabledExtensions,
+        exceptionType:
+            !exceptionVariantTags.isEmpty
+                ? Type.variant(exceptionVariantTags)
+                : exceptionType
     )
 
     for declaration in program.declarations {

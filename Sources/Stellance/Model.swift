@@ -23,6 +23,25 @@ enum KnownExtension: String, CustomStringConvertible, CaseIterable {
     case letrec = "letrec-bindings"
     case patternAscriptions = "pattern-ascriptions"
 
+    case sequencing
+    case references
+    case panic
+    case exceptions
+
+    case exceptionTypeDeclaraions = "exception-type-declaration"
+    case openVariantExceptions = "open-variant-exceptions"
+
+    case subtyping = "structural-subtyping"
+
+    case top = "top-type"
+    case bot = "bottom-type"
+    case asBottom = "ambiguous-type-as-bottom"
+
+    case cast = "type-cast"
+    case tryCast = "try-cast-as"
+    case castPatterns = "type-cast-patterns"
+
+
     var description: String {
         "#\(self.rawValue)"
     }
@@ -32,11 +51,15 @@ protocol Context {
     func type(of node: Identifier) -> Type?
 
     func isEnabled(_ ext: KnownExtension) -> Bool
+
+    var exceptionType: Type? { get }
 }
 
 struct GlobalContext: Context {
     let globalVariables: [Identifier: Type]
     let enabledExntesions: [KnownExtension]
+
+    let exceptionType: Type?
 
     func type(of node: Identifier) -> Type? {
         return globalVariables[node]
@@ -59,5 +82,9 @@ struct LocalContext: Context {
 
     func isEnabled(_ ext: KnownExtension) -> Bool {
         next.isEnabled(ext)
+    }
+
+    var exceptionType: Type? {
+        next.exceptionType
     }
 }

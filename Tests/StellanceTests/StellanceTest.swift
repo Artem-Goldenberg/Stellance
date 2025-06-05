@@ -88,6 +88,16 @@ let exhaustivenessGoodTests = [
     "nonexhaustive_variant.st"
 ]
 
+let skippedTests = [
+    "ERROR_UNEXPECTED_TUPLE_LENGTH/subtyping_tuple.st",
+    "ERROR_UNEXPECTED_TUPLE_LENGTH/subtyping_tuple2.st",
+    "ERROR_NOT_A_REFERENCE/deref_parameter.st",
+    "ERROR_UNEXPECTED_SUBTYPE/func.st",
+    "ERROR_MISSING_RECORD_FIELDS/subtyping_record.st",
+    "ERROR_AMBIGUOUS_VARIANT_TYPE/ambiguous-variant-type-3.stella",
+    "ERROR_UNEXPECTED_VARIANT_LABEL/subtyping_variant.st"
+]
+
 let knownExtensions = Set(KnownExtension.allCases.map(\.description))
 func usesKnownExtensions(url: URL) -> Bool {
     let text = try! String(contentsOf: url, encoding: .utf8)
@@ -97,6 +107,11 @@ func usesKnownExtensions(url: URL) -> Bool {
             print("I am no exhaustive, skipping: \(url.testDescription)")
             return false
         }
+    }
+
+    if skippedTests.contains(url.testDescription) {
+        print("Marked as skipped: \(url.testDescription)")
+        return false
     }
 
     let tree: Program

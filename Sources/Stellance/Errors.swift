@@ -45,6 +45,15 @@ enum TypeCheckError: Error {
 
     case unexpectedNonNullVariantPattern(for: Identifier, in: Pattern, type: Type)
     case unexpectedNullVariantPattern(for: Identifier, missedType: Type, in: Pattern, type: Type)
+
+    case exceptionNotDeclared(usedIn: Expression)
+    case ambiguousThrow(Expression)
+    case ambiguousReference(Expression)
+    case ambiguousPanic(Expression)
+    case notAReference(actualType: Type, in: Expression)
+    case unexpectedReference(Expression, expected: Type)
+    case unexpectedAddress(Expression, expected: Type)
+    case unexpectedSubtype(Type, of: Type, in: Expression)
 }
 
 extension TypeCheckError {
@@ -88,6 +97,14 @@ extension TypeCheckError {
         case .missingData: "ERROR_MISSING_DATA_FOR_LABEL"
         case .unexpectedNonNullVariantPattern: "ERROR_UNEXPECTED_NON_NULLARY_VARIANT_PATTERN"
         case .unexpectedNullVariantPattern: "ERROR_UNEXPECTED_NULLARY_VARIANT_PATTERN"
+        case .exceptionNotDeclared: "ERROR_EXCEPTION_TYPE_NOT_DECLARED"
+        case .ambiguousThrow: "ERROR_AMBIGUOUS_THROW_TYPE"
+        case .ambiguousReference: "ERROR_AMBIGUOUS_REFERENCE_TYPE"
+        case .ambiguousPanic: "ERROR_AMBIGUOUS_PANIC_TYPE"
+        case .notAReference: "ERROR_NOT_A_REFERENCE"
+        case .unexpectedReference: "ERROR_UNEXPECTED_REFERENCE"
+        case .unexpectedAddress: "ERROR_UNEXPECTED_MEMORY_ADDRESS"
+        case .unexpectedSubtype: "ERROR_UNEXPECTED_SUBTYPE"
         }
     }
 }
@@ -300,6 +317,52 @@ extension TypeCheckError {
             Pattern: \(wrap: pattern.code)
             provides a pattern to match for a label: '\(tag.code)', 
             but this tag must be null according to a matching type: \(wrap: type.code)
+            """
+
+        case let .unexpectedAddress(expr, expected):
+            """
+            Expected expression of type: \(wrap: expected.code)
+            Instead have a reference expression:
+                \(indented: expr.code)
+            """
+        case let .notAReference(actualType, in: expr):
+            """
+            Expected an expression of a reference type, 
+            instead have expression of type: \(wrap: actualType.code)
+            In expression:
+                \(indented: expr.code)
+            """
+        case let .ambiguousPanic(expr):
+            """
+            Cannot infer type for a panic expression: 
+                \(indented: expr.code)
+            """
+        case let .exceptionNotDeclared(usedIn: expr):
+            """
+            No exception is declared, but exceptions are used in:
+                \(indented: expr.code)
+            """
+        case let .ambiguousThrow(expr):
+            """
+            Cannot infer type for a throw expression:
+                \(indented: expr.code)
+            """
+        case let .ambiguousReference(expr):
+            """
+            Cannot infer type for a reference expression:
+                \(indented: expr.code)
+            """
+        case let .unexpectedSubtype(subtype, of: type, in: expr):
+            """
+            Type: \(wrap: subtype.code)
+            Is not a subtype of: \(wrap: type.code)
+            In expression:
+                \(indented: expr.code)
+            """
+        case let .unexpectedReference(expr, expected: type):
+            """
+            Was expecting an expression of type: \(wrap: type.code)
+            Instead got: \(wrap: expr.code)
             """
         }
     }

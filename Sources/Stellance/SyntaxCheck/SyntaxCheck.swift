@@ -61,11 +61,13 @@ func check(_ decl: Declaration, in context: GlobalContext) throws {
     case .typeAlias(_, _):
         throw Code.unsupported(decl, tryEnabling: nil)
 
-    case .exceptionType(_):
-        throw Code.unsupported(decl, tryEnabling: nil)
+    case .exceptionType(let type):
+        try betterEnable(.exceptionTypeDeclaraions, for: decl, in: context)
+        try check(type, in: context)
 
-    case .exceptionVariant(_, _):
-        throw Code.unsupported(decl, tryEnabling: nil)
+    case .exceptionVariant(_, let type):
+        try betterEnable(.openVariantExceptions, for: decl, in: context)
+        try check(type, in: context)
 
     }
 }

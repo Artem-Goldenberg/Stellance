@@ -103,8 +103,19 @@ func |-(context: Context, expr: Expression) throws -> Type {
         try context |- ascriptee <= type
         return type
 
-    case .inl, .inr:
-        throw Code.error(.ambiguosSum(expr))
+    case let .inl(inner):
+        let left = try context |- inner
+        guard context.isEnabled(.asBottom) else {
+            throw Code.error(.ambiguosSum(expr))
+        }
+        return .sum(left: left, right: .bottom)
+
+    case let .inr(inner):
+        let right = try context |- inner
+        guard context.isEnabled(.asBottom) else {
+            throw Code.error(.ambiguosSum(expr))
+        }
+        return .sum(left: .bottom, right: right)
 
     case let .match(matchee, branches):
         let matchingType = try context |- matchee
@@ -158,8 +169,18 @@ func |-(context: Context, expr: Expression) throws -> Type {
         }
         return .bool
 
-    case .variant:
-        throw Code.error(.ambiguosVariant(expr))
+    case let .variant(tag, .none):
+        guard context.isEnabled(.subtyping) else {
+            throw Code.error(.ambiguosVariant(expr))
+        }
+        return .variant([(tag, nil)])
+
+    case let .variant(tag, .some(forExpr)):
+        let type = try context |- forExpr
+        guard context.isEnabled(.subtyping) else {
+            throw Code.error(.ambiguosVariant(expr))
+        }
+        return .variant([(tag, type)])
 
     case let .fix(theExpr):
         let exprType = try context |- theExpr
@@ -171,12 +192,79 @@ func |-(context: Context, expr: Expression) throws -> Type {
                 .incorrectArgumentsNumber(fromTypes.count, expected: 1, for: exprType, in: expr)
             )
         }
-        guard fromTypes[0] == toType else {
+        guard compare(fromTypes[0], toType, in: context) else {
+            if context.isEnabled(.subtyping) {
+                throw Code.error(.unexpectedSubtype(toType, of: fromTypes[0], in: expr))
+            }
             throw Code.error(
                 .unexpectedType(toType, expected: fromTypes[0], in: expr)
             )
         }
         return toType
+
+    case let .sequence(first, second):
+        try context |- first <= .unit
+        return try context |- second
+
+    case let .ref(toExpr):
+        return try .reference(context |- toExpr)
+
+    case let .deref(refExpr):
+        let exprType = try context |- refExpr
+        guard case let .reference(toType) = exprType else {
+            throw Code.error(.notAReference(actualType: exprType, in: expr))
+        }
+        return toType
+
+    case let .assign(assignee, expr):
+        let assigneeType = try context |- assignee
+        guard case let .reference(toType) = assigneeType else {
+            throw Code.error(.notAReference(actualType: assigneeType, in: expr))
+        }
+        try context |- expr <= toType
+        return .unit
+
+    case .constMemory:
+        throw Code.error(.ambiguousReference(expr))
+
+    case .panic:
+        guard context.isEnabled(.asBottom) else {
+            throw Code.error(.ambiguousPanic(expr))
+        }
+        return .bottom
+
+    case let .throw(theExpr):
+        guard let throwType = context.exceptionType else {
+            throw Code.error(.exceptionNotDeclared(usedIn: expr))
+        }
+        try context |- theExpr <= throwType
+        guard context.isEnabled(.subtyping) else {
+            throw Code.error(.ambiguousThrow(expr))
+        }
+        return .bottom
+
+    case let .tryWith(expr, recover):
+        let type = try context |- expr
+        try context |- recover <= type
+        return type
+
+    case let .tryCatch(tryExpr, pattern, recover):
+        let type = try context |- tryExpr
+        guard let throwType = context.exceptionType else {
+            throw Code.error(.exceptionNotDeclared(usedIn: expr))
+        }
+        try context + pattern ~> throwType |- recover <= type
+        return type
+
+    case let .typeCast(castee, asType):
+        let _ = try context |- castee
+        return asType
+
+    case let .tryCastAs(tryExpr, type, pattern, newExpr, with: recover):
+        let _ = try context |- tryExpr
+        let type = try context + pattern ~> type |- newExpr
+        try context |- recover <= type
+        return type
 
     default:
         throw Code.unsupported(expr, description: "Inference not implemented")

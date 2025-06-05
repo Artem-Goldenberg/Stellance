@@ -55,8 +55,11 @@ func check(_ pattern: Pattern, in context: GlobalContext) throws {
         try check(type, in: context)
         try recCheck(pattern)
 
-    default:
-        throw Code.unsupported(pattern, tryEnabling: nil)
+    case let .cast(pattern, as: type):
+        try require(.castPatterns)
+        try recCheck(pattern)
+        try check(type, in: context)
+        
     }
 }
 

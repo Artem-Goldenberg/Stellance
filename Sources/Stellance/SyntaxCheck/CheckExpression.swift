@@ -159,6 +159,58 @@ func check(_ expr: Expression, in context: GlobalContext) throws {
         try require(.fixpoint)
         try recCheck(expr)
 
+    case let .sequence(first, second):
+        try require(.sequencing)
+        try recCheck(first)
+        try recCheck(second)
+
+    case let .ref(ini):
+        try require(.references)
+        try recCheck(ini)
+
+    case let .deref(ref):
+        try require(.references)
+        try recCheck(ref)
+
+    case let .assign(asignee, expr):
+        try require(.references)
+        try recCheck(asignee)
+        try recCheck(expr)
+
+    case .constMemory:
+        try require(.references)
+
+    case .panic:
+        try require(.panic)
+
+    case let .throw(expr):
+        try require(.exceptions)
+        try recCheck(expr)
+
+    case let .tryWith(expr, recover):
+        try require(.exceptions)
+        try recCheck(expr)
+        try recCheck(recover)
+
+    case let .tryCatch(expr, pattern, recover):
+        try require(.exceptions)
+        try recCheck(expr)
+        try check(pattern, in: context)
+        try recCheck(recover)
+
+    case let .typeCast(expr, type):
+        try require(.cast)
+        try recCheck(expr)
+        try check(type, in: context)
+
+    case let .tryCastAs(expr, type, pattern, newExpr, with: recover):
+        try require(.tryCast)
+        try recCheck(expr)
+        try check(type, in: context)
+        try check(pattern, in: context)
+        try recCheck(newExpr)
+        try recCheck(recover)
+
     default:
         throw Code.unsupported(expr, description: "Not supported yet")
 

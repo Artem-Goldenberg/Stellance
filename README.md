@@ -44,4 +44,6 @@ If the provided program type checks fine, the type checker will finish with 0 re
 
 - Implementation for Stage 1 should support all extesions (extra ones as well) specified in the pdf task for this stage
 
+- Stage 2: All extensions specified in the .pdf should work as well
+
 

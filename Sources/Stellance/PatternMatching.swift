@@ -11,7 +11,22 @@ func +(context: Context, bind: Binding) throws -> Context {
     case let .var(name):
         return context + name ~> type
 
-    case .false, .true, .unit, .int:
+    case .false, .true:
+        guard case .bool = type else {
+            throw badPattern
+        }
+        return context
+
+    case .unit:
+        guard case .unit = type else {
+            throw badPattern
+        }
+        return context
+
+    case .int:
+        guard case .nat = type else {
+            throw badPattern
+        }
         return context
 
     case let .succ(inner):
@@ -88,13 +103,14 @@ func +(context: Context, bind: Binding) throws -> Context {
 
     case let .ascription(pattern, asType):
         // for future stages should be more sophisticated
-        guard asType == type else {
+        guard asType ~ type else {
             throw badPattern
         }
         return try context + pattern ~> asType
 
-    default:
-        throw Code.unsupported(pattern, description: "Not implemented")
+    case let .cast(pattern, as: type):
+        return try context + pattern ~> type
+
     }
 }
 
@@ -119,6 +135,9 @@ func +(context: Context, pattern: Pattern) throws -> Context {
         try context + pattern
 
     case let .ascription(pattern, type):
+        try context + pattern ~> type
+
+    case let .cast(pattern, as: type):
         try context + pattern ~> type
 
     default:

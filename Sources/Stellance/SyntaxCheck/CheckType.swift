@@ -69,6 +69,13 @@ func check(_ type: Type, in context: GlobalContext) throws {
 
         try tags.compactMap(\.1).forEach(recCheck)
 
+    case .reference(let to):
+        try require(.references)
+        try recCheck(to)
+
+    case .bottom: try require(.bot)
+    case .top: try require(.top)
+
     default:
         throw Code.unsupported(type, tryEnabling: nil)
     }
